@@ -8,6 +8,7 @@ from statsmodels.tsa.ar_model import AutoReg
 import statsmodels.api as sm
 from pmdarima.arima import auto_arima
 from prophet import Prophet
+from statsmodels.tsa.forecasting.theta import ThetaModel
 
 app = Flask(__name__)
 
@@ -633,6 +634,31 @@ def volatilema():
 
     return jsonify(sales_prediction), 200
 
+# THETA MODEL 
+@app.route("/thetamodel", methods=["POST"])
+def thetamodel():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+
+    for each in product_dfs:
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+
+            # print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            
+            tm = ThetaModel(each['qty_ordered'])
+            res = tm.fit()
+
+            predicted_value = res.forecast(1).iloc[0]
+            predicted_value = int(predicted_value)
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
 
 if __name__ == "__main__":
     app.run(debug=True)
