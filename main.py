@@ -448,5 +448,149 @@ def ave():
 
     return jsonify(sales_prediction), 200
 
+# SIMPLE MOVING AVERAGE
+@app.route("/simplema", methods=["POST"])
+def simplema():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+
+    for each in product_dfs:
+        # Simple Moving Average Implementation
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            # Predict the next day's sales
+            predicted_value = temp_df['qty_ordered'].rolling(window=7).mean().iloc[-1]
+
+            # Extract just the predicted value as a int
+            predicted_value = int(predicted_value)
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+    
+    return jsonify(sales_prediction), 200
+
+# WEIGHTED MOVING AVERAGE
+@app.route("/weightedma", methods=["POST"])
+def weightedma():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+
+    for each in product_dfs:
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            # get the weighted sum of the last 7 days
+            weighted_sum = 0
+            for i in range(1,7):
+                weighted_sum += (i * temp_df['qty_ordered'].iloc[-i])
+            
+            # get the mean of weighted sum
+            predicted_value = weighted_sum / 28 # [7(7+1)]/2
+
+            predicted_value = int(predicted_value)
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
+
+# EXPONENTIAL MOVING AVERAGE
+@app.route("/exponentialma", methods=["POST"])
+def exponentialma():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+
+    for each in product_dfs:
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            # seting the smoothing factor
+            alpha = 0.2
+            
+            # getting the moving average, while adding the previous value to it
+            predicted_value = temp_df['qty_ordered'].ewm(alpha=alpha, adjust=False).mean().iloc[-1]
+
+            predicted_value = int(predicted_value)
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+    
+    return jsonify(sales_prediction), 200
+
+# TRIANGULAR MOVING AVERAGE
+@app.route("/triangularma", methods=["POST"])
+def triangularma():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+
+    for each in product_dfs:
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            # setting the window size for the moving average
+            window_size = 7
+
+            # get the simple moving average of the data
+            temp_df['simple_ma'] = temp_df['qty_ordered'].rolling(window=window_size).mean()
+
+            # get the moving average of each moving average
+            predicted_value = temp_df['simple_ma'].rolling(window=window_size).mean().iloc[-1]
+
+            predicted_value = int(predicted_value)
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
+
+# VOLATILE MOVING AVERAGE
+@app.route("/volatilema", methods=["POST"])
+def volatilema():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+
+    for each in product_dfs:
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            # set window and alpha values
+            window_size = 7
+            alpha = 0.2
+
+            # calculate standard deviation
+            purchase_std = temp_df['qty_ordered'].pct_change().rolling(window=window_size).std()
+
+            # calculate and collect most recent weight
+            weight = alpha / (1 + purchase_std).iloc[-1]
+
+            # apply weight to moving average
+            predicted_value = temp_df['qty_ordered'].ewm(alpha=weight, adjust=False).mean().iloc[-1]
+
+            predicted_value = int(predicted_value)
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
+
+
 if __name__ == "__main__":
     app.run(debug=True)
+
+
