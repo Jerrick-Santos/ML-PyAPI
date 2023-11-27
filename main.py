@@ -6,6 +6,7 @@ import json
 from statsmodels.tsa.api import ExponentialSmoothing, SimpleExpSmoothing, Holt
 from statsmodels.tsa.ar_model import AutoReg
 import statsmodels.api as sm
+from pmdarima.arima import auto_arima
 
 app = Flask(__name__)
 
@@ -142,6 +143,131 @@ def autoreg():
             sales_prediction[current_product] = predicted_value
 
     sales_prediction
+
+    return jsonify(sales_prediction), 200
+
+
+# ARMA
+@app.route("/arma", methods=["POST"])
+def ARMA():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+    for each in product_dfs:
+        # ARMA Implementation
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+            
+            #Get PACF for AR Component
+            pacf, pvalues = sm.tsa.pacf(temp_df['qty_ordered'], nlags=10, alpha=0.05)
+            ar_lags = get_lagged_value(pacf)
+            
+            #Get ACF for MA Component
+            acf, pvalues = sm.tsa.acf(temp_df['qty_ordered'], nlags=10, alpha=0.05)
+            ma_lags = get_lagged_value(acf)
+            
+            ARMA_model = sm.tsa.arima.ARIMA(temp_df['qty_ordered'], order=(ar_lags, 0, ma_lags)).fit()
+
+            # Predict the next day's sales
+            forecast_next_day = ARMA_model.predict(start=len(temp_df['qty_ordered']), end=len(temp_df['qty_ordered']))
+
+            # Extract just the predicted value as a int
+            predicted_value = int(forecast_next_day.values[0])
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    sales_prediction
+
+    return jsonify(sales_prediction), 200
+
+
+# ARIMA
+@app.route("/arima", methods=["POST"])
+def ARIMA():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+    for each in product_dfs:
+        # ARMA Implementation
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+            
+            #Get PACF for AR Component
+            pacf, pvalues = sm.tsa.pacf(temp_df['qty_ordered'], nlags=10, alpha=0.05)
+            ar_lags = get_lagged_value(pacf)
+            
+            #Get ACF for MA Component
+            acf, pvalues = sm.tsa.acf(temp_df['qty_ordered'], nlags=10, alpha=0.05)
+            ma_lags = get_lagged_value(acf)
+            
+            ARIMA_model = sm.tsa.arima.ARIMA(temp_df['qty_ordered'], order=(ar_lags, 1, ma_lags)).fit()
+
+            # Predict the next day's sales
+            forecast_next_day = ARIMA_model.predict(start=len(temp_df['qty_ordered']), end=len(temp_df['qty_ordered']))
+
+            # Extract just the predicted value as a int
+            predicted_value = int(forecast_next_day.values[0])
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
+
+# SARIMA - Seasonal ARIMA
+@app.route("/sarima", methods=["POST"])
+def SARIMA():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+    for each in product_dfs:
+        # SARIMA Implementation
+        if len(each) >= 29:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+            
+            
+            SARIMA_model = auto_arima(temp_df, trace=True, error_action='ignore', start_p=0,start_q=2,max_p=10,max_q=10,m=7,suppress_warnings=True,stepwise=True,seasonal=True)
+            SARIMA_model.fit(temp_df)
+            
+            # Predict the next day's sales
+            forecast_next_day = SARIMA_model.predict(n_periods=1)
+
+            # Extract just the predicted value as a int
+            predicted_value = int(forecast_next_day.values[0])
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
+
+
+
+# BASIC FORECASTING 
+
+# AVERAGE MODEL 
+@app.route("/ave", methods=["POST"])
+def ave():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+    for each in product_dfs:
+        # ARMA Implementation
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            # Predict the next day's sales by averaging all the data
+            predicted_value = int(temp_df['qty_ordered'].mean())
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
 
     return jsonify(sales_prediction), 200
 
