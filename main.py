@@ -7,6 +7,7 @@ from statsmodels.tsa.api import ExponentialSmoothing, SimpleExpSmoothing, Holt
 from statsmodels.tsa.ar_model import AutoReg
 import statsmodels.api as sm
 from pmdarima.arima import auto_arima
+from prophet import Prophet
 
 app = Flask(__name__)
 
@@ -107,6 +108,149 @@ def ses():
 
             # Extract just the predicted value as a int
             predicted_value = int(forecast_next_day.values[0])
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
+
+
+# Holt Additive 
+@app.route("/holtadd", methods=["POST"])
+def holtadd():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+    for each in product_dfs:
+        # Implementing SES
+        if len(each) > 2:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            holtadd_initialize = Holt(temp_df)
+            holtadd_model = holtadd_initialize.fit(optimized = True)
+
+            # Predict the next day's sales
+            forecast_next_day = holtadd_model.forecast(steps=1)
+
+            # Extract just the predicted value as a int
+            predicted_value = int(forecast_next_day.values[0])
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
+
+# Holt Multiplicative 
+@app.route("/holtmul", methods=["POST"])
+def holtmul():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+    for each in product_dfs:
+        # Implementing SES
+        if len(each) > 2:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            # Drop Zero Values
+            temp_df = temp_df.query('qty_ordered > 0')
+
+            holtmul_initialize = Holt(temp_df, exponential=True)
+            holtmul_model = holtmul_initialize.fit(optimized = True)
+
+            # Predict the next day's sales
+            forecast_next_day = holtmul_model.forecast(steps=1)
+
+            # Extract just the predicted value as a int
+            predicted_value = int(forecast_next_day.values[0])
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
+
+# Holt Winter's Additive 
+@app.route("/hwadd", methods=["POST"])
+def hwadd():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+    for each in product_dfs:
+        # Implementing SES
+        if len(each) > 2:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            # Drop Zero Values
+            temp_df = temp_df.query('qty_ordered > 0')
+
+            hwadd_initialize = ExponentialSmoothing(temp_df, seasonal_periods=7, trend="add", seasonal="add")
+            hwadd_model = hwadd_initialize.fit(optimized = True)
+
+            # Predict the next day's sales
+            forecast_next_day = hwadd_model.forecast(steps=1)
+
+            # Extract just the predicted value as a int
+            predicted_value = int(forecast_next_day.values[0])
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
+
+# Holt Winter's Multiplicative 
+@app.route("/hwmul", methods=["POST"])
+def hwmul():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+    for each in product_dfs:
+        # Implementing SES
+        if len(each) > 2:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            # Drop Zero Values
+            temp_df = temp_df.query('qty_ordered > 0')
+
+            hwmul_initialize = ExponentialSmoothing(temp_df, seasonal_periods=7, trend="mul", seasonal="mul")
+            hwmul_model = hwmul_initialize.fit(optimized = True)
+
+            # Predict the next day's sales
+            forecast_next_day = hwmul_model.forecast(steps=1)
+
+            # Extract just the predicted value as a int
+            predicted_value = int(forecast_next_day.values[0])
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
+
+
+# SMA(7) Implementation
+@app.route("/sma", methods=["POST"])
+def sma():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+    for each in product_dfs:
+        # Simple Moving Average Implementation
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            # Predict the next day's sales
+            predicted_value = temp_df['qty_ordered'].rolling(window=7).mean().iloc[-1]
+
+            # Extract just the predicted value as a int
+            predicted_value = int(predicted_value)
 
             print("Forecasted sales for the next day:", predicted_value)
             sales_prediction[current_product] = predicted_value
@@ -246,6 +390,39 @@ def SARIMA():
 
     return jsonify(sales_prediction), 200
 
+
+# FB Prophet 
+@app.route("/fbprophet", methods=["POST"])
+def fb_prophet():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+    for each in product_dfs:
+        # FB Prophet Implementation
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+            
+            # Reformat data to fit into FB Prophet Model 
+            temp_df = temp_df.reset_index()
+            temp_df = temp_df.rename(columns = {'date':'ds', 'qty_ordered':'y'})
+            
+            
+            # Create a Prophet object and fit it to the data
+            model = Prophet()
+            model.fit(temp_df)
+
+            # Predict Next Time Step
+            future = model.make_future_dataframe(periods=1)
+
+            forecast = model.predict(future)
+            predicted_value = int(forecast[['yhat']].iloc[-1])
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
 
 
 # BASIC FORECASTING 
