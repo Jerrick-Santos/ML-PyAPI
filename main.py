@@ -427,14 +427,14 @@ def fb_prophet():
 
 # BASIC FORECASTING 
 
-# AVERAGE MODEL 
+# AVERAGE FORECAST 
 @app.route("/ave", methods=["POST"])
 def ave():
     data = request.get_json()
     product_dfs = data_cleaning(data)
     sales_prediction = {}
     for each in product_dfs:
-        # ARMA Implementation
+        # AVERAGE FORECAST Implementation
         if len(each) >= 10:
             current_product = each['product_id'].iloc[0]
             print(current_product)
@@ -448,29 +448,73 @@ def ave():
 
     return jsonify(sales_prediction), 200
 
-# SIMPLE MOVING AVERAGE
-@app.route("/simplema", methods=["POST"])
-def simplema():
+# NAIVE FORECASTING
+@app.route("/naive", methods=["POST"])
+def naive():
     data = request.get_json()
     product_dfs = data_cleaning(data)
     sales_prediction = {}
-
     for each in product_dfs:
-        # Simple Moving Average Implementation
+        # AVERAGE FORECAST Implementation
         if len(each) >= 10:
             current_product = each['product_id'].iloc[0]
             print(current_product)
             temp_df = each[['qty_ordered']].copy()
 
-            # Predict the next day's sales
-            predicted_value = temp_df['qty_ordered'].rolling(window=7).mean().iloc[-1]
-
-            # Extract just the predicted value as a int
-            predicted_value = int(predicted_value)
+            # Predict the next day's sales by the last timestep order (n - 1)
+            predicted_value = int(temp_df['qty_ordered'].iloc[-1])
 
             print("Forecasted sales for the next day:", predicted_value)
             sales_prediction[current_product] = predicted_value
-    
+
+    return jsonify(sales_prediction), 200
+
+# SEASONAL NAIVE FORECASTING
+@app.route("/snaive", methods=["POST"])
+def snaive():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+    for each in product_dfs:
+        # AVERAGE FORECAST IMPLEMENTATION
+        season_component = 7
+
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+
+            # Predict the next day's sales by the last timestep order (n - 1)
+            predicted_value = int(temp_df['qty_ordered'].iloc[-1 - season_component])
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
+    return jsonify(sales_prediction), 200
+
+# DRIFT MODEL
+@app.route("/drift", methods=["POST"])
+def drift():
+    data = request.get_json()
+    product_dfs = data_cleaning(data)
+    sales_prediction = {}
+    for each in product_dfs:
+        # DRIFT IMPLEMENTATION
+        h = 1
+        if len(each) >= 10:
+            current_product = each['product_id'].iloc[0]
+            print(current_product)
+            temp_df = each[['qty_ordered']].copy()
+            
+            # constant = (current_timevalue - first_timevalue) / number of elements in the series
+            constant = (temp_df['qty_ordered'].iloc[-1] - temp_df['qty_ordered'].iloc[0]) / len(temp_df['qty_ordered'])
+
+            # Predict the next day's using the constat and h = 1
+            predicted_value = int(temp_df['qty_ordered'].iloc[-1] + h * constant) 
+
+            print("Forecasted sales for the next day:", predicted_value)
+            sales_prediction[current_product] = predicted_value
+
     return jsonify(sales_prediction), 200
 
 # WEIGHTED MOVING AVERAGE
