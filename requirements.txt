@@ -89,7 +89,6 @@ trio==0.22.0
 trio-websocket==0.10.2
 tzdata==2023.3
 urllib3==1.26.15
-vboxapi==1.0
 wcwidth==0.2.6
 Werkzeug==3.0.1
 wsproto==1.2.0
